@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <p align="center">
     <img src="https://github.com/wintercms/winter/raw/develop/.github/assets/Github%20Banner.png?raw=true" alt="Winter CMS Logo" width="100%" />
 </p>
@@ -108,3 +109,16 @@ The Winter platform is open-sourced software licensed under the [MIT license](ht
 ## Security vulnerabilities
 
 Please review [our security policy](https://github.com/wintercms/winter/security/policy) on how to report security vulnerabilities.
+=======
+# media_collector
+
+Плагін + тема найпростішого менеджера завантажень із можливістю:
+
+* завантажувати анонімно файли
+* трирівнева система папок
+* управління файлами
+* корзина
+* обмеження доступів по IP
+* визначення прав користувачів
+* та ін
+>>>>>>> 2ee326c145cfad173c9b93146465a4c567fed828
