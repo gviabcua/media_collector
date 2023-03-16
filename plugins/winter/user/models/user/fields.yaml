@@ -1,0 +1,95 @@
+# ===================================
+#  Field Definitions
+# ===================================
+
+fields:
+
+    name:
+        label: winter.user::lang.user.name
+        span: auto
+
+    surname:
+        label: winter.user::lang.user.surname
+        span: auto
+
+tabs:
+    fields:
+
+        email:
+            label: winter.user::lang.user.email
+            tab: winter.user::lang.user.account
+            span: full
+
+        send_invite:
+            type: checkbox
+            label: winter.user::lang.user.send_invite
+            comment: winter.user::lang.user.send_invite_comment
+            tab: winter.user::lang.user.account
+            default: true
+            context: create
+
+        block_mail:
+            label: winter.user::lang.user.block_mail
+            tab: winter.user::lang.user.account
+            type: checkbox
+            span: full
+            cssClass: field-align-above
+            context: update
+
+        password@create:
+            label: winter.user::lang.user.create_password
+            comment: winter.user::lang.user.create_password_comment
+            tab: winter.user::lang.user.account
+            type: password
+            span: left
+
+        password@update:
+            label: winter.user::lang.user.reset_password
+            comment: winter.user::lang.user.reset_password_comment
+            tab: winter.user::lang.user.account
+            type: password
+            span: left
+
+        password_confirmation:
+            label: winter.user::lang.user.confirm_password
+            comment: winter.user::lang.user.confirm_password_comment
+            tab: winter.user::lang.user.account
+            type: password
+            span: right
+            context: [create, update]
+
+        username:
+            label: winter.user::lang.user.username
+            tab: winter.user::lang.user.account
+            hidden: true
+            span: left
+
+        groups:
+            label: winter.user::lang.user.groups
+            tab: winter.user::lang.user.account
+            type: relation
+            emptyOption: winter.user::lang.user.empty_groups
+
+        created_ip_address:
+            label: winter.user::lang.user.created_ip_address
+            span: auto
+            disabled: true
+            tab: winter.user::lang.user.account
+            context: preview
+
+        last_ip_address:
+            label: winter.user::lang.user.last_ip_address
+            span: auto
+            disabled: true
+            tab: winter.user::lang.user.account
+            context: preview
+
+secondaryTabs:
+    fields:
+
+        avatar:
+            label: winter.user::lang.user.avatar
+            type: fileupload
+            mode: image
+            imageHeight: 260
+            imageWidth: 260

@@ -1,0 +1,23 @@
+{
+    "name": "gviabcua/media_collector",
+    "type": "media_collector",
+    "description": "Media Collector Winter CMS theme",
+    "keywords": ["winter", "cms", "gviabcua", "theme"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "gviabcua",
+            "email": "gviabcua@gmail.com",
+            "role": "Co-founder"
+        }
+    ],
+    "require": {
+        "php": ">=5.4",
+        "composer/installers": "~1.0"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    }
+}

@@ -1,0 +1,237 @@
+description = "Default layout"
+
+[account]
+paramCode = "code"
+forceSecure = 0
+requirePassword = 0
+
+[session]
+security = "all"
+==
+<?php
+use Gviabcua\Media\Models\Files;
+use Config;
+function onStart(){
+	switch($this->check_admin_ip()){
+		case "0":$this['allow_login'] = 0;break;
+		case "1":$this['allow_login'] = 1;break;
+		case "2":$this['allow_login'] = 0;exit;break;
+	}
+}
+function onUploadMedia()
+{
+	if(Input::file('files')){
+		$count = 0;
+		foreach(Input::file('files') as $file){
+			(strlen(Input::post('title')) < 1) ? $title = 'no_name' : $title = Input::post('title');
+			(strlen(Input::post('author')) < 1) ? $author = 'anonymous' : $author = Input::post('author');
+			(Input::post('folder_id') > 0) ? $folder_id = Input::post('folder_id') : $folder_id = null;
+			$f = new Files;
+			$f->title 				= 	$title;
+			$f->uploaded_by 		= 	$author;
+			$f->folder_id 			= 	$folder_id;
+			$f->file = $file;
+			$f->save();
+			unset($f);
+			$count ++;
+		}
+		Flash::success("Uploaded $count files");
+		return back();
+	}else{
+		Flash::error("No file atachments");
+	}
+}
+function check_admin_ip() {
+	$ip = $this->get_client_ip();
+	if(in_array($ip, Config::get('allowedip.white_ip'))){
+		return 1;
+	}
+	if(in_array($ip, Config::get('allowedip.black_ip'))){
+		return 2;
+	}
+	return 0;
+}
+function get_client_ip() {
+	$ipaddress = '';
+	if (isset($_SERVER['HTTP_CLIENT_IP'])) {
+		$ipaddress = $_SERVER['HTTP_CLIENT_IP'];
+	} else if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+		$ipaddress = $_SERVER['HTTP_X_FORWARDED_FOR'];
+	} else if (isset($_SERVER['HTTP_X_FORWARDED'])) {
+		$ipaddress = $_SERVER['HTTP_X_FORWARDED'];
+	} else if (isset($_SERVER['HTTP_FORWARDED_FOR'])) {
+		$ipaddress = $_SERVER['HTTP_FORWARDED_FOR'];
+	} else if (isset($_SERVER['HTTP_FORWARDED'])) {
+		$ipaddress = $_SERVER['HTTP_FORWARDED'];
+	} else if (isset($_SERVER['REMOTE_ADDR'])) {
+		$ipaddress = $_SERVER['REMOTE_ADDR'];
+	} else {
+		$ipaddress = 'IP UNKNOWN';
+	}
+	//if ()
+	return $ipaddress;
+}
+?>
+==
+<!DOCTYPE html>
+{% component 'session' %}
+<html lang="en" class="h-100"  data-bs-theme="dark">
+    <head>
+        <meta charset="utf-8">
+        <title>MediaCollector - {{ this.page.title }}</title>
+        <meta name="title" content="{{ this.page.meta_title }}">
+        <meta name="author" content="gviabcua">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="generator" content="MediaCollector">
+        <link rel="icon" type="image/png" href="{{"assets/images/favicon.png"|theme}}">
+        <script src="{{ 'assets/vendor/jquery.js'|theme }}"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js" integrity="sha512-Ixzuzfxv1EqafeQlTCufWfaC6ful6WFqIz4G+dWvK0beHw0NVJwvCKSgafpy5gwNqKmgUfIBraVwkKI+Cz0SEQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css" integrity="sha512-ZKX+BvQihRJPA8CROKBhDNvoc2aDMOdAlcm7TUQY+35XYtrd3yh95QOOhsPDQY9QnKE0Wqag9y38OIgEvb88cA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+        {% styles %}
+        <style>
+        	.list-group-item{
+        		padding:3px !important;
+        	}
+        	.pointer{
+        		cursor:pointer;
+        	}
+        	.a-folder{
+        		text-decoration: none;
+				color: white;
+				text-align: center;
+        	}
+        	.pad-25{
+        		padding: 25px;
+        	}
+        </style>
+    </head>
+    <body style="font-size: 14px;">
+    	{% flash %}
+		    <p
+		        data-control="flash-message"
+		        class="flash-message fade"
+		        data-flash-type="{{ type }}"
+		        data-flash-duration="5">
+		        {{ message }}
+		    </p>
+		{% endflash %}
+        <!-- Header -->
+        {% if user %}
+	        <header id="layout-header">
+	            {% partial 'site/header' %}
+	        </header>
+	    {%endif%}
+        <!-- Content -->
+        <section id="layout-content">
+
+        
+
+        	
+        	
+			{% if not user %}
+				<div class="container">
+					<div class="row">
+						<div class="col-md-3"></div>
+						<div class="col-md-6">
+							{% partial 'upload' %}
+						</div>
+					</div>
+				</div>
+				{%if allow_login == 1%}
+					<hr>
+				    <div class="row">
+						<div class="col-md-5"></div>
+				        <div class="col-md-2">
+				        	<details>
+							    <summary>Увійти</summary>
+							    {% partial account ~ '::signin' %}
+							</details>
+				        </div>
+						<div class="col-md-5"></div>
+				    </div>
+				{% endif %}
+			{% else %}
+				{%if allow_login == 1%}
+					{% page %}
+				{% endif %}
+			{% endif %}
+        </section>
+			
+        <!-- Footer -->
+        <footer id="layout-footer">
+            {% partial 'site/footer' %}
+        </footer>
+
+		<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz9ATKxIep9tiCxS/Z9fNfEXiDAYTujMAeBAsjFuCZSmKbSSUnQlmh/jp3" crossorigin="anonymous"></script>
+        <!-- Scripts -->
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js" integrity="sha384-mQ93GR66B00ZXjt0YO5KlohRA5SY2XofN4zfuZxLkoj1gXtW8ANNCe9d5Y3eG5eD" crossorigin="anonymous"></script>
+		
+        {% snowboard all %}
+        {% scripts %}
+		<script>
+			$("#myModal").on("hidden.bs.modal", function () {
+				$('#modal-title').html('');
+				$('#modal-body').html('<div style="text-align: center;">Пуста відповідь або щось не так</div>').show(1000);
+				$('#modal-footer').html('');
+				$(".modal-dialog").removeClass("modal-fullscreen");
+				$(".modal-dialog").removeClass("modal-dialog-lg");
+				$(".modal-dialog").removeClass("modal-xl");
+				$(".modal-dialog").removeClass("modal-lg");
+				$(".modal-dialog").removeClass("modal-sm");
+				$(".modal-dialog").addClass("modal-lg");
+				$('[data-bs-toggle="tooltip"]').tooltip('hide');
+				$('[data-bs-toggle="popover"]').popover('hide');
+			});
+			
+			$(document).on('hide.bs.modal','#myModal', function () {
+				$('#modal-title').html('');
+				$('#modal-body').html('<div style="text-align: center;">Пуста відповідь або щось не так</div>').show(1000);
+				$('#modal-footer').html('');
+				$(".modal-dialog").removeClass("modal-fullscreen");
+				$(".modal-dialog").removeClass("modal-dialog-lg");
+				$(".modal-dialog").removeClass("modal-lg");
+				$(".modal-dialog").removeClass("modal-xl");
+				$(".modal-dialog").removeClass("modal-sm");
+				$(".modal-dialog").addClass("modal-lg");
+				$('[data-bs-toggle="tooltip"]').tooltip('hide');
+				$('[data-bs-toggle="popover"]').popover('hide');
+			});
+
+			$('#myModal').on('shown.bs.modal', function () {
+				$('[data-bs-toggle="tooltip"]').tooltip({trigger : 'hover'});
+				$('[data-bs-toggle="tooltip"]').tooltip('hide');
+				$('[data-bs-toggle="popover"]').popover('hide');
+			});
+			$(document).on('shown.bs.modal', function () {
+				$('[data-bs-toggle="tooltip"]').tooltip({trigger : 'hover'});
+				$('[data-bs-toggle="tooltip"]').tooltip('hide');
+				$('[data-bs-toggle="popover"]').popover('hide');
+			})
+
+		</script>
+		<!-- Modal -->
+		<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
+			<div id="modal-dialog" class="modal-dialog  modal-dialog-scrollable modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h6 id="modal-title" class="modal-title" id="exampleModalScrollableTitle">***</h6>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
+				<div class="modal-body" id="modal-body" style="font-size:12px;">
+					<div  style="text-align: center;">
+						Пуста відповідь або щось не так
+					</div>
+				</div>
+				<div class="modal-footer">
+					<small>
+						<small><p class="muted credit">&copy; {{ "now" | date("Y") }} MediaCollector - Created by <a href="https://gviabcua.in.ua" target="_blank">gviabcua</a>.</p></small>
+					</small>
+				</div>
+				</div>
+			</div>
+		</div>
+    </body>
+</html>

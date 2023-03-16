@@ -1,0 +1,31 @@
+# ===================================
+#  Form Behavior Config
+# ===================================
+
+# Record name
+name: winter.user::lang.group.label
+
+# Model Form Field configuration
+form: $/winter/user/models/usergroup/fields.yaml
+
+# Model Class name
+modelClass: Winter\User\Models\UserGroup
+
+# Default redirect location
+defaultRedirect: winter/user/usergroups
+
+# Create page
+create:
+    title: winter.user::lang.groups.create_title
+    redirect: winter/user/usergroups/update/:id
+    redirectClose: winter/user/usergroups
+
+# Update page
+update:
+    title: winter.user::lang.groups.update_title
+    redirect: winter/user/usergroups
+    redirectClose: winter/user/usergroups
+
+# Preview page
+preview:
+    title: winter.user::lang.groups.update_title

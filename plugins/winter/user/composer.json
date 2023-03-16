@@ -1,0 +1,37 @@
+{
+    "name": "winter/wn-user-plugin",
+    "type": "winter-plugin",
+    "description": "User plugin for Winter CMS",
+    "homepage": "https://github.com/wintercms/wn-user-plugin",
+    "keywords": ["winter cms", "winter", "plugin", "user", "authentication"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Alexey Bobkov",
+            "email": "aleksey.bobkov@gmail.com",
+            "role": "Original Author"
+        },
+        {
+            "name": "Samuel Georges",
+            "email": "daftspunky@gmail.com",
+            "role": "Original Author"
+        },
+        {
+            "name": "Winter CMS Maintainers",
+            "homepage": "https://wintercms.com",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/wintercms/wn-user-plugin/issues",
+        "discord": "https://discord.gg/D5MFSPH6Ux",
+        "source": "https://github.com/wintercms/wn-user-plugin"
+    },
+    "require": {
+        "php": ">=7.2",
+        "composer/installers": "~1.0"
+    },
+    "extra": {
+        "installer-name": "user"
+    }
+}

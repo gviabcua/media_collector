@@ -1,0 +1,11 @@
+1.0.1:
+    - 'Initialize plugin.'
+1.0.2:
+    - 'Created table gviabcua_media_files'
+    - builder_table_create_gviabcua_media_files.php
+1.0.3:
+    - 'Created table gviabcua_media_folders'
+    - builder_table_create_gviabcua_media_folders.php
+1.0.4:
+    - 'Updated table gviabcua_media_files'
+    - builder_table_update_gviabcua_media_files.php

@@ -1,0 +1,43 @@
+==
+<?php
+function onStart(){
+	$user = Auth::getUser();
+	if($user) {
+		$this['folder_id'] = trim(e(get("folder_id")));
+	}
+}
+?>
+==
+<div class="card">
+	<div class="card-body">
+		{{ form_ajax('onUploadMedia',  { files: true, class: 'modal-body', 'data-request-flash': true, 'data-request-validate':true, 'data-request-success':"alert(data['result'])" }) }}
+		<fieldset>
+			<h6 class="text-center">Завантаження файлів</h6>
+			{%if folder_id%}
+				<input type='number' name="folder_id" value="{{folder_id}}" hidden>
+			{%endif%}
+			<div class="mb-3 row">
+				<label for="title" class="col-sm-2 col-form-label">Назва</label>
+				<div class="col-sm-10">
+					<input type="text" class="form-control" id="title" name="title">
+				</div>
+			</div>
+			<div class="mb-3 row">
+				<label for="author" class="col-sm-2 col-form-label">Автор</label>
+				<div class="col-sm-10">
+					<input type="text" class="form-control" id="author" name="author" value="{{ user.name }}">
+				</div>
+			</div>
+			<div class="mb-3 row">
+				<label for="formFile" class="col-sm-2 col-form-label">Файли</label>
+				<div class="col-sm-10">
+					<input class="form-control" type="file" id="files" name='files[]' multiple>
+				</div>
+			</div>
+			 <div class="mb-3 row">
+			 	<button type="submit" class="btn btn-outline-light">Завантажити</button>
+			 </div>
+		</fieldset>
+		{{ form_close() }}
+	</div>
+</div>

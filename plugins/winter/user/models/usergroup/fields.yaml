@@ -1,0 +1,19 @@
+# ===================================
+#  Field Definitions
+# ===================================
+
+fields:
+    name:
+        label: winter.user::lang.group.name
+        span: left
+
+    code:
+        label: winter.user::lang.group.code
+        comment: winter.user::lang.group.code_comment
+        span: right
+        preset: name
+
+    description:
+        label: winter.user::lang.group.description_field
+        type: textarea
+        size: tiny

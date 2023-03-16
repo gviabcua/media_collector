@@ -1,0 +1,695 @@
+title = "FIleManager"
+url = "/"
+layout = "default"
+is_hidden = 0
+==
+<?php
+use Gviabcua\Media\Models\Files;
+use Gviabcua\Media\Models\Folders;
+use System\Models\File as SFiles;
+use Winter\Storm\Database\Attach;
+
+function permission(){
+	$user = Auth::getUser();
+	$permission = array();
+	if($user){
+		$permission = $user->UserAllPermission();
+	}
+	return $permission;
+}
+
+function onStart()
+{
+	$permission = $this->permission();
+	if(isset($permission['can-delete-folder'])){$this['can_delete_folder'] = 1;}
+	if(isset($permission['can-edit-folder'])){$this['can_edit_folder'] = 1;}
+	if(isset($permission['can-edit-file'])){$this['can_edit_file'] = 1;}
+	if(isset($permission['can-delete-file'])){$this['can_delete_file'] = 1;}
+
+    $file_size = 0;
+    $file_total = 0;
+	$file_total_all = 0;
+	$file_extension_total = [];
+    foreach( File::allFiles(storage_path()."/app/uploads/public") as $file)
+    {
+    	$get_file_size = $file->getSize();
+        $file_size += $get_file_size;
+        $file_total_all ++;
+        
+        $ext = $file->getExtension();
+        if(isset($file_extension_total[$ext])){
+        	$file_extension_total[$ext]['count'] = $file_extension_total[$ext]['count'] + 1;
+        	$file_extension_total[$ext]['size'] = $file_extension_total[$ext]['size'] + $get_file_size;
+        }else{
+        	$file_extension_total[$ext]['count'] = 1;
+        	$file_extension_total[$ext]['size'] = $get_file_size;
+        }
+        if(str_contains($file->getfileName(), "_crop.")){
+        	
+        }else{
+        	$file_total++;
+        }
+    }
+    if(!empty($file_extension_total)){
+    	ksort($file_extension_total);
+    }
+    $this['file_extension_total'] = collect($file_extension_total);
+    $this['file_size'] = number_format($file_size / 1048576,2);
+    $this['file_total'] = $file_total ." (тех. ".$file_total_all.")";
+
+
+	$folder_id = trim(e(get('folder_id')));
+	$this['folder_id'] = $folder_id;
+	$trashed = trim(e(get('trashed')));
+	$this['trashed'] = $trashed;
+	
+	
+	if($trashed == 1){
+		
+	}else{
+		if($folder_id > 0){
+			$this['parent_folders'] = Folders::where("parent_folder_id", $folder_id)->orderby('title', "desc")->get();
+		}else{
+			$this['parent_folders'] = Folders::where("parent_folder_id", null)->orderby('title', "desc")->get();
+		}
+	}
+	
+	$type = trim(e(get('type')));
+	$this['type'] = $type;
+	
+	$this['files_trashed_count'] = Files::with('file')->where('trashed', 1)->count();
+		
+	$group_count_by_folder = Files::select('folder_id', DB::raw('count(*) as total'))->groupBy('folder_id')->where('trashed', 0)->get();
+	if(!empty($group_count_by_folder)){
+		$arr_temp = [];
+		foreach($group_count_by_folder as $c){
+			if($c->folder_id == null)$c->folder_id = 0;
+			$arr_temp[$c->folder_id] = $c->total;
+		}
+		$this['group_count_by_folder'] = $arr_temp;
+		unset($arr_temp);
+	}
+		
+		
+	$this['files'] = Files::with('file');
+	if($trashed == 1){
+		$this['files'] = $this['files']->where('trashed', 1);
+	}else{
+		$this['files'] = $this['files']->where('trashed', 0);
+		if($this['folder_id'] > 0){
+			$this['files'] = $this['files']->where('folder_id', $this['folder_id']);
+		}else{
+			$this['files'] = $this['files']->where('folder_id', null);
+		}
+	}
+	if($this['type'] != null){
+		$this['files'] = $this['files']->whereHas('file', function ($q) use ($type) {
+			$q->where("content_type","like",$type."/%");
+		});
+	}
+	$this['files'] = $this['files']->get();
+	
+	
+	if($trashed == 1){
+		$this['folder_trash'] = 1;
+	}else{
+		if($folder_id > 0){
+			$folder_current = Folders::where("id", $folder_id)->first();
+			$this['folder_current'] = $folder_current;
+			if(isset($folder_current->parent_folder_id)){
+				$this['folder_up'] = Folders::where("id", $folder_current->parent_folder_id)->first();
+			}else{
+				$this['folder_up_on_main'] = 1;
+			}
+		}else{
+			$this['root_folder'] = 1;
+		}
+	}
+	
+	
+	$folders_array =[];
+	$folders_root = Folders::where("parent_folder_id", null)->orderby('title', "desc")->get();
+    foreach($folders_root as $fr){
+    	$folders_array[$fr->id]['title'] = $fr->title;
+		$folders_1 = Folders::where("parent_folder_id", $fr->id)->orderby('title', "desc")->get();
+		foreach($folders_1 as $f1){
+			$folders_array[$fr->id]['parent'][$f1->id]['title'] = $f1->title;
+			$folders_2 = Folders::where("parent_folder_id", $f1->id)->orderby('title', "desc")->get();
+			foreach($folders_2 as $f2){
+				$folders_array[$fr->id]['parent'][$f1->id]['parent'][$f2->id]['title'] = $f2->title;
+			}
+		}
+		
+    }
+	$this['folders'] =$folders_array;
+	
+	//foreach(Files::get() as $d){
+	//	$d->delete();
+	//}
+	
+}
+
+function onViewFile(){
+	$id = trim(e(post("id")));
+	$file = Files::find($id);
+	$file_name = null;
+	$created_at = null;
+	$view = null;
+	$download = null;
+	$file_size = null;
+	//print_r($file);
+	$out = "";
+	if(isset($file->file->content_type)){
+		$path = $file->file->getPath();
+		$file_size = round(($file->file->file_size/1024),1) ."kb";
+		$file_name = $file->file->file_name;
+		$download = '<a class="btn btn-outline-primary btn-sm" href="'.$path.'" download><i class="bi bi-cloud-download"></i> Завантажити</a>';
+		switch(explode("/", $file->file->content_type)[0]){
+			case "image":
+				$view = '<a href="'.$path.'" data-lightbox="lightbox"><img src="'.$path.'" class="img-fluid" alt="'.$file->title.'" style=" max-height:400px;"></a>';
+			break;
+			case "video":
+				$view = '<video width="100%" style="max-height: 400px;" controls>
+					<source src="'.$path.'" type="video/mp4">
+					Your browser does not support the video tag.
+				</video>';
+			break;
+			default:
+				$view = '<img src="/themes/media-gviabcua/assets/images/No_image_preview.png" class="img-fluid" alt="'.$file->title.'" style=" max-height:400px;">';
+				break;
+		}  
+		$out = "
+		<div class='row'>
+			<div class='col-md-9' style='text-align: center;'>$view</div>
+			<div class='col-md-3'>
+				$download <hr>
+				Size: $file_size<br>
+				File name: $file_name<br>
+				Content Type: ".$file->file->content_type."<br>
+				Створено: ".$file->created_at."<br>
+				Оновлено: ".$file->updated_at."<br>
+			</div>
+		</div>
+		
+		
+		<div><br></div>
+		
+		<form  autocomplete='off' autofill='false' data-request='onUpdateMediaFile' data-request-flash>
+			<input type='number' value='".$file->id."' name='id' hidden>
+			<div class='row'>
+				<div class='col-md-6'>
+					<div class='form-floating mb-3'>
+						<input type='text' class='form-control' id='title' placeholder='' value='".$file->title."' name='title'>
+						<label for='title'>Заголовок</label>
+					</div>
+				</div>
+				<div class='col-md-6'>
+					<div class='form-floating mb-3'>
+						<input type='text' class='form-control' id='uploaded_by' placeholder='' value='".$file->uploaded_by."' name='uploaded_by'>
+						<label for='uploaded_by'>Автор</label>
+					</div>
+				</div>
+				<div class='col-md-6'>
+					<div class='form-floating'>
+					  <select class='form-select' id='floatingSelect' aria-label='Floating label select example' name='folder_id'>
+					    <option value='0'>Коренева папка</option>";
+					    $folders_root = Folders::where("parent_folder_id", null)->orderby('title', "desc")->get();
+					    foreach($folders_root as $fr){
+					    	($file->folder_id == $fr->id) ? $selected = "selected" : $selected = "";
+					    	$out .= "<option value='".$fr->id."' $selected >".$fr->title."</option>";
+							$folders_1 = Folders::where("parent_folder_id", $fr->id)->orderby('title', "desc")->get();
+							foreach($folders_1 as $f1){
+								($file->folder_id == $f1->id) ? $selected = "selected" : $selected = "";
+								$out .= "<option value='".$f1->id."' $selected >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".$f1->title."</option>";
+								$folders_2 = Folders::where("parent_folder_id", $f1->id)->orderby('title', "desc")->get();
+								foreach($folders_2 as $f2){
+									($file->folder_id == $f2->id) ? $selected = "selected" : $selected = "";
+									$out .= "<option value='".$f2->id."' $selected >&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".$f2->title."</option>";
+								}
+							}
+					    }
+					  $out .= "</select>
+					  <label for='floatingSelect'>Папка розміщення</label>
+					</div>
+				</div>
+				<div class='col-md-6 d-grid gap-2'>
+					<button type='submit' class='btn btn-success btn-block'><i class='bi bi-folder-plus'></i> Зберегти</button>
+				</div>
+			</div>
+			
+		";
+		$out .= "</form>";
+		if($file->trashed == 1){
+			$out .= "<button  class='btn btn-block btn-primary btn-block mt-3 btn-sm' onclick=\"onRestoreFile(".$file->id.")\"><i class='bi bi-arrow-repeat'></i> Відновити файл</button>";
+		}
+		($file->trashed == 1) ? $text_delete = "Видалити остаточно" : $text_delete = "В корзину";
+		$out .= "<button class='btn btn-block btn-danger btn-block mt-3 btn-sm' onclick=\"onDeleteFile(".$file->id.")\"><i class='bi bi-trash-fill'></i> $text_delete</button>";
+	}
+	return $out;
+}
+
+function onUpdateMediaFile(){
+	$permission = $this->permission();
+	if(isset($permission['can-edit-file'])){
+		if(Input::post('id') > 0){
+			$a = Files::find(Input::post('id'));
+			if(isset($a->id)){
+				Input::post('folder_id') > 0 ? $a->folder_id = Input::post('folder_id') : $a->folder_id = null;
+				$a->title = Input::post('title');
+				$a->uploaded_by = Input::post('uploaded_by');
+				$a->save();
+				Flash::success("Збережено");
+				if($a->folder_id > 0){
+					return back();
+					//return Redirect::to('/?folder_id='. $a->folder_id);
+				}
+				return Redirect::to('/');
+			}
+			Flash::error("NO Record");
+		}
+		Flash::error("NO ID");
+	}else{
+		echo 1;
+		Flash::error("Permission denied");
+	}
+}
+
+function onAddFolderForm(){
+	$permission = $this->permission();
+	if(isset($permission['can-edit-folder'])){
+		$folders_root = Folders::where("parent_folder_id", null)->orderby('title', "desc")->get();
+		$out = "<form  autocomplete='off' autofill='false' data-request='onAddFolder' data-request-flash>
+			<div class='form-floating mb-3'>
+				<input type='text' class='form-control' id='title' placeholder='' name='title'>
+				<label for='title'>Назва</label>
+			</div>
+			<div class='form-floating'>
+			  <select class='form-select' id='floatingSelect' aria-label='Floating label select example' name = 'folder_id'>
+			    <option value='0'>Коренева папка</option>";
+			    $current_folder_id = trim(e(get("folder_id")));
+			    foreach($folders_root as $fr){
+			    	($current_folder_id == $fr->id) ? $selected = "selected" : $selected = "";
+			    	$out .= "<option value='".$fr->id."' $selected>".$fr->title."</option>";
+					$folders_1 = Folders::where("parent_folder_id", $fr->id)->orderby('title', "desc")->get();
+					foreach($folders_1 as $f1){
+						($current_folder_id == $f1->id) ? $selected = "selected" : $selected = "";
+						$out .= "<option value='".$f1->id."' $selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".$f1->title."</option>";
+					}
+			    }
+			  $out .= "</select>
+			  <label for='floatingSelect'>Папка розміщення</label>
+			</div>
+			<button type='submit' class='btn btn-success btn-block mt-3'><i class='bi bi-folder-plus'></i> Зберегти</button>
+		</form>";
+		return $out;
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+function onAddFolder(){
+	$permission = $this->permission();
+	if(isset($permission['can-edit-folder'])){
+		$title = trim(e(post('title')));
+		$folder_id = trim(e(post('folder_id')));
+		($folder_id == 0) ? $folder_id = null : "";
+		if(strlen($title) > 1){
+			$f = new Folders();
+			$f->title = $title;
+			$f->parent_folder_id = $folder_id;
+			$f->save();
+			Flash::success("Додано");
+			return Redirect::to('/?folder_id='. $f->id);
+		}else{
+			Flash::error("Коротке ім'я");
+		}
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+
+function onEditFolderForm(){
+	$permission = $this->permission();
+	if(isset($permission['can-edit-folder'])){
+		$id = trim(e(post("id")));
+		$f_info = Folders::where("id", $id)->first();
+		if(isset($f_info->id)){
+			$folders_root = Folders::where("parent_folder_id", null)->orderby('title', "desc")->get();
+			$out = "<form  autocomplete='off' autofill='false' data-request='onEditFolder' data-request-flash>
+				<input value='".$f_info->id."' type='number' hidden name='id'>
+				<div class='form-floating mb-3'>
+					<input type='text' class='form-control' id='title' placeholder='' name='title' value='".$f_info->title."'>
+					<label for='title'>Назва</label>
+				</div>
+				<div class='form-floating'>
+				  <select class='form-select' id='floatingSelect' aria-label='Floating label select example' name = 'folder_id'>
+				    <option value='0'>Коренева папка</option>";
+				    foreach($folders_root as $fr){
+				    	($f_info->parent_folder_id == $fr->id) ? $selected = "selected" : $selected = "";
+				    	$out .= "<option value='".$fr->id."' $selected>".$fr->title.$f_info->parent_folder_id."</option>";
+						$folders_1 = Folders::where("parent_folder_id", $fr->id)->orderby('title', "desc")->get();
+						foreach($folders_1 as $f1){
+							($f_info->parent_folder_id == $f1->id) ? $selected = "selected" : $selected = "";
+							$out .= "<option value='".$f1->id."' $selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".$f1->title."</option>";
+						}
+				    }
+				  $out .= "</select>
+				  <label for='floatingSelect'>Папка розміщення</label>
+				</div>
+				<button type='submit' class='btn btn-success btn-block mt-3'><i class='bi bi-folder-plus'></i> Зберегти</button>
+			</form>";
+		}else{
+			$out = "No ID";
+		}
+		return $out;
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+
+function onEditFolder(){
+	$permission = $this->permission();
+	if(isset($permission['can-edit-folder'])){
+		$id = trim(e(post('id')));
+		$title = trim(e(post('title')));
+		$folder_id = trim(e(post('folder_id')));
+		if(strlen($title) > 1){
+			$f = Folders::find($id);
+			$f->title = $title;
+			$f->parent_folder_id = $folder_id;
+			$f->save();
+			Flash::success("Змінено");
+			return back();
+		}else{
+			Flash::error("Коротке ім'я");
+		}
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+
+function onDeleteFolderForm(){
+	$permission = $this->permission();
+	if(isset($permission['can-edit-folder'])){
+		$id = trim(e(post("id")));
+		$f_info = Folders::where("id", $id)->first();
+		if(isset($f_info->id)){
+			$folders_root = Folders::where("parent_folder_id", null)->orderby('title', "desc")->get();
+			$out = "
+			<div class='alert alert-info'>Вкажіть папку, куди необхідно перемістити документи</div>
+			<form  autocomplete='off' autofill='false' data-request='onDeleteFolder' data-request-flash>
+				<input value='".$f_info->id."' type='number' hidden name='id'>
+				<div class='form-floating'>
+				  <select class='form-select' id='floatingSelect' aria-label='Floating label select example' name = 'folder_id'>
+				    <option value='0'>Коренева папка</option>";
+				    foreach($folders_root as $fr){
+				    	($f_info->parent_folder_id == $fr->id) ? $selected = "selected" : $selected = "";
+				    	$out .= "<option value='".$fr->id."' $selected>".$fr->title."</option>";
+						$folders_1 = Folders::where("parent_folder_id", $fr->id)->orderby('title', "desc")->get();
+						foreach($folders_1 as $f1){
+							($f_info->parent_folder_id == $f1->id) ? $selected = "selected" : $selected = "";
+							$out .= "<option value='".$f1->id."' $selected>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".$f1->title."</option>";
+						}
+				    }
+				  $out .= "</select>
+				  <label for='floatingSelect'>Папка для розміщення</label>
+				</div>
+				<button type='submit' class='btn btn-danger btn-block mt-3'><i class='bi bi-folder-x'></i> Перемістити і видалити</button>
+			</form>";
+		}else{
+			$out = "No ID";
+		}
+		return $out;
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+function onDeleteFolder(){
+	$permission = $this->permission();
+	if(isset($permission['can-delete-folder']) and isset($permission['can-edit-folder'])){
+		$id = trim(e(post("id")));
+		$folder_id = trim(e(post("folder_id")));
+		($folder_id == 0) ? $folder_id = null : "";
+		Files::where("folder_id", $id)->update(['folder_id' => $folder_id]);
+		Folders::where("parent_folder_id", $id)->update(['parent_folder_id' => $folder_id]);
+		Folders::where("id", $id)->delete();
+		return Redirect::to('/?folder_id='. $folder_id);
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+
+function onRestoreFile(){
+	$permission = $this->permission();
+	if(isset($permission['can-delete-file'])){
+		Files::where('id', trim(e(post('id'))))->update(['trashed' => 0]);
+		return back();
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+
+function onDeleteFile(){
+	$permission = $this->permission();
+	if(isset($permission['can-delete-file'])){
+		$file = Files::where('id', trim(e(post('id'))))->get();
+		foreach($file as $d){
+			if($d->trashed == 1){
+				$d->delete();
+			}else{
+				Files::where('id', trim(e(post('id'))))->update(['trashed' => 1]);
+			}
+		}
+		return back();
+	}else{
+		Flash::error("Permission denied");
+		return "Permission denied";
+	}
+}
+?>
+==
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-md-8 text-center">
+			<div class="btn-group" role="group" aria-label="Basic outlined example">
+				<a type="button" class="btn btn-outline-primary " href="?folder_id={{folder_id}}&type=&trashed={{trashed}}">Все</a>
+				<a type="button" class="btn {% if type == "text"%}btn-primary{%else%}btn-outline-primary{%endif%}" href="?folder_id={{folder_id}}&type=text&trashed={{trashed}}" >TEXT</a>
+				<a type="button" class="btn {% if type == "image"%}btn-primary{%else%}btn-outline-primary{%endif%}" href="?folder_id={{folder_id}}&type=image&trashed={{trashed}}">IMAGE</a>
+				<a type="button" class="btn {% if type == "video"%}btn-primary{%else%}btn-outline-primary{%endif%}" href="?folder_id={{folder_id}}&type=video&trashed={{trashed}}">VIDEO</a>
+				<a type="button" class="btn {% if type == "application"%}btn-primary{%else%}btn-outline-primary{%endif%}" href="?folder_id={{folder_id}}&type=application&trashed={{trashed}}">APP</a>
+				<a type="button" class="btn {% if type == "other"%}btn-primary{%else%}btn-outline-primary{%endif%}" href="?folder_id={{folder_id}}&type=other&trashed={{trashed}}">OTHER</a>
+			</div>
+		</div>
+		<div class="col-md-4 text-center">
+			<div class="accordion accordion-flush" id="accordionExample">
+				  <div class="accordion-item">
+				    <h2 class="accordion-header" id="headingTwo">
+				      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+				        Завантажити медіа в поточну папку
+				      </button>
+				    </h2>
+				    <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#accordionExample">
+				      <div class="accordion-body">
+						<div class="row">
+							<div class="col-md-12">
+								{% partial 'upload' %}
+							</div>
+						</div>
+				      </div>
+				    </div>
+				  </div>
+				</div>
+		</div>
+	</div>
+	<hr>
+	<div class="row">
+		<div class="col-md-2">
+			{%if can_edit_folder%}
+				<button class="btn btn-success btn-sm mb-3"  onclick="onAddFolderForm();"><i class="bi bi-folder-plus"></i> Створити папку</button>
+			{%endif%}
+			<ul class="list-group">
+			  <a href="?type={{type}}" class="list-group-item d-flex justify-content-between align-items-start"><span><i class="bi bi-house"></i> Головна</span> <span class="badge bg-success rounded-pill">{{group_count_by_folder[0]}}</span></a>
+			  {% for key, f in folders%}
+			  	<a href="?folder_id={{key}}&type={{type}}" class="list-group-item d-flex justify-content-between align-items-start {% if folder_id == key%}active{%endif%}"><span>&nbsp;&nbsp;<i class="bi bi-folder2-open"></i> {{f.title}}</span> <span class="badge bg-success rounded-pill">{{group_count_by_folder[key]}}</span></a>
+			  	{%if f.parent%}
+					{% for k, v in f.parent%}
+						<a href="?folder_id={{k}}&type={{type}}"  class="list-group-item d-flex justify-content-between align-items-start {% if folder_id == k%}active{%endif%}"><span>&nbsp;&nbsp;&nbsp;&nbsp;<i class="bi bi-folder2"></i> {{v.title}}</span> <span class="badge bg-success rounded-pill">{{group_count_by_folder[k]}}</span></a>
+						{%if v.parent%}
+							{% for k1, v1 in v.parent%}
+								<a href="?folder_id={{k1}}&type={{type}}"  class="list-group-item d-flex justify-content-between align-items-start {% if folder_id == k1%}active{%endif%}"><span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="bi bi-folder2"></i> {{v1.title}}</span> <span class="badge bg-success rounded-pill">{{group_count_by_folder[k1]}}</span></a>
+					  		{% endfor%}
+					  	{%endif%}
+			  		{% endfor%}
+			  	{%endif%}
+			  {% endfor%}
+			  <a href="?trashed=1&folder_id={{key}}&type={{type}}" class="list-group-item d-flex justify-content-between align-items-start text-danger {% if trashed == 1%}active{%endif%}"><span><i class="bi bi-trash-fill"></i> Корзина</span><span class="badge bg-danger rounded-pill">{{files_trashed_count}}</span></a>
+			  <a class="list-group-item list-group-item-action"></a>
+			  <a class="list-group-item list-group-item-action"><i class="bi bi-database"></i> {{file_size}}Mb, файлів: {{file_total}}</a>
+			  <a class="list-group-item list-group-item-action">
+				  <table class="table table-sm">
+				  	<thead>
+				  		<tr>
+				  			<th>Ext</th>
+				  			<th>Count</th>
+				  			<th>Size</th>
+				  		</tr>
+				  	</thead>
+				  	<tbody>
+				  		{% for ext, file in file_extension_total%}
+				  			<tr>
+				  				<td>{{ext}}</td>
+				  				<td>{{file.count}}</td>
+				  				<td>{{(file.size/1024/1024)|round(1, 'floor')}}Mb</td>
+				  			</tr>
+					  {%endfor%}
+				  	</tbody>
+				  </table>
+			  </a>
+			  
+			  
+			  
+			  
+			  
+			</ul>
+		
+		</div>
+		<div class="col-md-10">
+			<div class="row">
+				{%if root_folder == 1 %}
+					<div class="col-12">Коренева папка</div>
+				{%elseif folder_trash == 1%}
+					<div class="col-12">Корзина</div>
+				{%else%}
+					<div class="col-10">{{folder_current.title}} </div>
+					{%if can_edit_folder%}
+						<div class="col-1"><i class="bi bi-pencil-fill text-warning pointer" onclick="onEditFolderForm({{folder_current.id}})"></i></div>
+					{%endif%}
+					{%if can_delete_folder and can_edit_folder%}
+						<div class="col-1"><i class="bi bi-folder-x text-danger pointer" onclick="onDeleteFolderForm({{folder_current.id}})"></i></div>
+					{%endif%}
+				{%endif%}
+			</div>
+			<hr>
+			<div class="row" style="font-size:11px;">
+				{%if folder_up%}
+					<div class="col-xl-1 col-lg-1 col-md-3 col-sm-4 col-12">
+						<div class="card pointer">
+							<a href="?folder_id={{folder_up.id}}&type={{type}}" class="a-folder">
+								<img src="{{"assets/images/folder_up.png"|theme}}" class="card-img-top"  style="padding: 7px;">
+								{{folder_up.title}}
+							</a>
+						</div>
+					</div>
+				{%endif%}
+				{%if folder_up_on_main%}
+					<div class="col-xl-1 col-lg-1 col-md-3 col-sm-4 col-12">
+						<div class="card pointer">
+							<a href="?type={{type}}" class="a-folder">
+								<img src="{{"assets/images/folder_up.png"|theme}}" class="card-img-top"  style="padding: 7px;">Головна
+							</a>
+						</div>
+					</div>
+				{%endif%}
+				
+				{%for rec in parent_folders%}
+					<div class="col-xl-1 col-lg-1 col-md-3 col-sm-4 col-12">
+						<div class="card pointer">
+							<a href="?folder_id={{rec.id}}&type={{type}}" class="a-folder">
+								<img src="{{"assets/images/folder.png"|theme}}" class="card-img-top" >
+								{{rec.title}}
+							</a>
+						</div>
+					</div>
+				{%endfor%}
+				{%for rec in files%}
+					<div class="col-xl-1 col-lg-1 col-md-3 col-sm-4 col-12">
+						<div class="card pointer" onclick="onViewFile({{rec.id}});">
+							{%if 'image' in rec.file.content_type%}
+								<img src="{{rec.file.thumb(200,200,{'mode':'crop'})}}" class="card-img-top pad-25" alt="...">
+							{%elseif 'video' in rec.file.content_type%}
+								<img src="{{"assets/images/video.png"|theme}}" class="card-img-top pad-25" alt="...">
+							{%elseif 'application' in rec.file.content_type%}
+								<img src="{{"assets/images/app.png"|theme}}" class="card-img-top pad-25" alt="...">
+							{%else%}
+								<img src="{{"assets/images/text.jpeg"|theme}}" class="card-img-top pad-25" alt="...">
+							{%endif%}
+							<span class="a-folder text-center text-truncate">{{rec.title}}</span>
+								<br>
+							<span class="text-center">{{((rec.file.file_size/1024)/1024)|round(2, 'floor')}} Mb</span>
+						</div>
+					</div>
+				{%endfor%}
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+	function onViewFile(id){
+		Snowboard.request(null, 'onViewFile', {
+		    data: {id: id,},
+		    success: (data) => {
+		        $('#modal-body').html(data.result);
+		        $('#modal-title').html('Перегляд/Редагування');
+				$('#modal-footer').html('');
+				$('.modal-dialog').addClass('modal-xl');
+				$('#myModal').modal('show');
+		    },
+		});
+	}
+	function onDeleteFile(id){
+		Snowboard.request(null, 'onDeleteFile', {
+			confirm: "Видалити файл?",
+			data: {id: id,},
+		    success: (data) => {
+		    },
+		});
+	}
+	function onRestoreFile(id){
+		Snowboard.request(null, 'onRestoreFile', {
+			confirm: "Відновити файл?",
+			data: {id: id,},
+		    success: (data) => {
+		    },
+		});
+	}
+	
+	
+	function onAddFolderForm(){
+		Snowboard.request(null, 'onAddFolderForm', {
+		    success: (data) => {
+		        $('#modal-body').html(data.result);
+				$('#modal-footer').html('');
+				$('#myModal').modal('show');
+		    },
+		});
+	}
+	function onEditFolderForm(id){
+		Snowboard.request(null, 'onEditFolderForm', {
+			data: {id: id,},
+		    success: (data) => {
+		        $('#modal-body').html(data.result);
+				$('#modal-footer').html('');
+				$('#myModal').modal('show');
+		    },
+		});
+	}
+	function onDeleteFolderForm(id){
+		Snowboard.request(null, 'onDeleteFolderForm', {
+			data: {id: id,},
+			confirm: "Видалити папку?",
+		    success: (data) => {
+		        $('#modal-body').html(data.result);
+				$('#modal-footer').html('');
+				$('#myModal').modal('show');
+		    },
+		});
+	}
+	
+	
+</script>

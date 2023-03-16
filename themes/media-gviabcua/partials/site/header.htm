@@ -1,0 +1,39 @@
+<!-- Nav -->
+
+	<nav class="navbar bg-primary navbar-expand-lg bg-body-tertiary" data-bs-theme="dark">
+		<div class="container-fluid">
+	    <a class="navbar-brand" href="#">MediaCollector</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarScroll" aria-controls="navbarScroll" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarScroll">
+      <ul class="navbar-nav me-auto my-2 my-lg-0 navbar-nav-scroll" style="--bs-scroll-height: 100px;">
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="/">Головна</a>
+        </li>
+      </ul>
+
+
+		<div class="d-flex form-inline  my-2 my-lg-0" style="color:white;min-width: 150px;">
+			
+		<ul class="navbar-nav">
+		  <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="dropdown_user" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            {%if user.avatar%}&nbsp;<img src="{{user.avatar.getThumb(25,25, { mode : 'crop' } )}}" style="max-width:25px;max-height:25px;border-radius: 50%;">&nbsp;{%endif%}{{ user.name }}
+          </a>
+          <ul class="dropdown-menu   " aria-labelledby="dropdown_user"  style="font-size: 12px;">
+            <li><span class="dropdown-item" href="#">{%for name in user.groups%}{{name.name}} {%endfor%}</span></li>
+            <li><a class="dropdown-item" href="{{ url('/')}}profile"><i class="bi bi-person-circle"></i> {{"Профіль"}}</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" style="cursor:pointer;" data-request="onLogout" data-request-data="redirect: '/'"><i class="bi bi-box-arrow-right"></i> {{"Вихід"}}</a></li>
+          </ul>
+        </li>
+		</ul>
+		</div>
+
+
+    </div>
+
+	  </div>
+	
+	</nav>

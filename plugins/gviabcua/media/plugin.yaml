@@ -1,0 +1,6 @@
+plugin:
+    name: 'gviabcua.media::lang.plugin.name'
+    description: 'gviabcua.media::lang.plugin.description'
+    author: Gviabcua
+    icon: wn-icon-file-photo-o
+    replaces: {  }
